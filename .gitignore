@@ -1,0 +1,7 @@
+Models
+MLQA/Data/*
+*.json
+*.txt
+__pycache__
+*tmp_trainer*
+*runs*
