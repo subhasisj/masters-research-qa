@@ -16,10 +16,10 @@ from transformers import AutoModelForQuestionAnswering, AutoTokenizer, Trainer
 
 
 model = AutoModelForQuestionAnswering.from_pretrained(
-    "../Notebooks/squad-qa-minilmv2-XLMTokeinizer-8/checkpoint-7000"
+    "../models/ar-pretrained-squad-qa-minilmv2-8",
 )
 tokenizer = AutoTokenizer.from_pretrained(
-    "../Notebooks/squad-qa-minilmv2-XLMTokeinizer-8/checkpoint-7000"
+    "xlm-roberta-base"
 )
 
 print("Models Loaded....")
@@ -181,9 +181,9 @@ def postprocess_qa_predictions(
     return predictions
 
 
-# available_languages = ["en", "hi" , "es", "zh", "ar",  "de", "vi"]
-available_languages = ["vi"]
-context_language = "vi"
+available_languages = ["en", "hi" , "es", "zh", "ar",  "de", "vi"]
+# available_languages = ["vi"]
+context_language = "ar"
 
 for language in available_languages:
     question_language = language
@@ -192,6 +192,7 @@ for language in available_languages:
 
     validation_features = mlqa.map(
         prepare_validation_features,
+        batch_size = 8,
         batched=True,
         remove_columns=mlqa["test"].column_names,
     )
@@ -224,19 +225,20 @@ for language in available_languages:
     # for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
     prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
 
-    with open(
-        f"./formatted_predictions_{context_language}_{question_language}_baseline.json",
+    predictions_file = f"./{context_language}/formatted_predictions_{context_language}_{question_language}_DAPT.json"
+    with open(predictions_file
+        ,
         "w",
     ) as f:
         json.dump(prediction_dict, f)
 
     # Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
-    with open(f"./evaluation_output_{context_language}_{question_language}_baseline.txt", "w") as f:
+    with open(f"./{context_language}/evaluation_output_{context_language}_{question_language}_DAPT.txt", "w") as f:
         subprocess.run(
-            ["python", "mlqa_evaluation_v1.py", f"./Data/test/test-context-{context_language}-question-{question_language}.json", f"./formatted_predictions_{context_language}_{question_language}_baseline.json", f"{context_language}"],
+            ["python", "mlqa_evaluation_v1.py", f"./Data/test/test-context-{context_language}-question-{question_language}.json", predictions_file, f"{context_language}"],
             stdout=f,
         )
-    print(f"Evaluation output written to file: evaluation_output_{context_language}_{question_language}_baseline.txt")
+    print(f"Evaluation output written to file: ./{context_language}evaluation_output_{context_language}_{question_language}_DAPT.txt")
 # os.system(
 #     f"python mlqa_evaluation_v1.py ./MLQA/Data/test/test-context-{context_language}-question-{question_language}.json ./MLQA/formatted_predictions_{context_language}_{question_language}_baseline.json {context_language}"
 # )
