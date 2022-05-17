@@ -15,14 +15,18 @@ from tqdm.auto import tqdm
 from transformers import AutoModelForQuestionAnswering, AutoTokenizer, Trainer
 
 
-model = AutoModelForQuestionAnswering.from_pretrained(
-    "../models/ar-pretrained-squad-qa-minilmv2-8",
-)
-tokenizer = AutoTokenizer.from_pretrained(
-    "xlm-roberta-base"
-)
+context_language = "en"
+batch_size = 16
 
-print("Models Loaded....")
+model = AutoModelForQuestionAnswering.from_pretrained(
+    f"subhasisj/{context_language}-kd-XLM-minilmv2-4",
+)
+tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+print(f"Models Loaded to {device}....")
 print()
 # Load model into Huggingface Trainer
 
@@ -181,9 +185,16 @@ def postprocess_qa_predictions(
     return predictions
 
 
-available_languages = ["en", "hi" , "es", "zh", "ar",  "de", "vi"]
+available_languages = ["en", "hi", "es", "zh", "ar", "de", "vi"]
 # available_languages = ["vi"]
-context_language = "ar"
+
+# create a directory for context_language
+if not os.path.exists(context_language):
+    os.mkdir(context_language)
+
+# create a directory called TAPT inside the context_language directory
+if not os.path.exists(f"{context_language}/knowledge-distillation"):
+    os.mkdir(f"{context_language}/knowledge-distillation")
 
 for language in available_languages:
     question_language = language
@@ -192,7 +203,7 @@ for language in available_languages:
 
     validation_features = mlqa.map(
         prepare_validation_features,
-        batch_size = 8,
+        batch_size=batch_size,
         batched=True,
         remove_columns=mlqa["test"].column_names,
     )
@@ -225,20 +236,27 @@ for language in available_languages:
     # for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
     prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
 
-    predictions_file = f"./{context_language}/formatted_predictions_{context_language}_{question_language}_DAPT.json"
-    with open(predictions_file
-        ,
+    predictions_file = f"./{context_language}/knowledge-distillation/formatted_predictions_{context_language}_{question_language}_kd.json"
+    with open(
+        predictions_file,
         "w",
     ) as f:
         json.dump(prediction_dict, f)
 
     # Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
-    with open(f"./{context_language}/evaluation_output_{context_language}_{question_language}_DAPT.txt", "w") as f:
+    evaluation_output_path = f"./{context_language}/knowledge-distillation/evaluation_output_{context_language}_{question_language}_kd.txt"
+    with open(evaluation_output_path, "w") as f:
         subprocess.run(
-            ["python", "mlqa_evaluation_v1.py", f"./Data/test/test-context-{context_language}-question-{question_language}.json", predictions_file, f"{context_language}"],
+            [
+                "python",
+                "mlqa_evaluation_v1.py",
+                f"./Data/test/test-context-{context_language}-question-{question_language}.json",
+                predictions_file,
+                f"{context_language}",
+            ],
             stdout=f,
         )
-    print(f"Evaluation output written to file: ./{context_language}evaluation_output_{context_language}_{question_language}_DAPT.txt")
+    print(f"Evaluation output written to file: {evaluation_output_path}")
 # os.system(
 #     f"python mlqa_evaluation_v1.py ./MLQA/Data/test/test-context-{context_language}-question-{question_language}.json ./MLQA/formatted_predictions_{context_language}_{question_language}_baseline.json {context_language}"
 # )
@@ -250,4 +268,3 @@ for language in available_languages:
 # -   ARG3: Answer Language
 #
 # `python MLQA/mlqa_evaluation_v1.py ./MLQA/Data/test/test-context-en-question-hi.json ./MLQA/formatted_predictions_en_hi_baseline.json en`
-
