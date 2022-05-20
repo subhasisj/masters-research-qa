@@ -11,3 +11,4 @@ __pycache__
 *.model
 knowledge-distillation/vi-kd-XLM-minilmv2-4.tar.gz
 *.csv
+.cache
