@@ -14,6 +14,7 @@ import torch
 from tqdm.auto import tqdm
 from transformers import (
     AutoModelForQuestionAnswering,
+    AutoAdapterModel,
     AutoTokenizer,
     Trainer,
     AdapterConfig,
@@ -26,22 +27,29 @@ batch_size = 16
 # model = AutoModelForQuestionAnswering.from_pretrained(
 #     f"subhasisj/{context_language}-kd-XLM-minilmv2-4",
 # )
-model_path = f"../multi-task-learning/{context_language}-adapter-4"
-model = AutoModelForQuestionAnswering.from_pretrained(
+model_path = f"../multi-task-learning/{context_language}-adapter-en-trained"
+model = AutoAdapterModel.from_pretrained(
     model_path
 )
 
 config = AdapterConfig.load("pfeiffer", non_linearity="relu", reduction_factor=2)
-adapter_name_1 = model.load_adapter(
-    os.path.join(model_path,"en-adapter"), config=config, model_name="xlm-roberta-base"
-)
-adapter_name_2 = model.load_adapter(
-    os.path.join(model_path,"hi-adapter"), config=config
-)
-task_adapter = model.load_adapter(
-   os.path.join(model_path,"qa-adapter"), source="hf", load_as="pfeiffer_xlm_base"
-)
-model.active_adapters = Stack(adapter_name_2, task_adapter)
+adapter_name_1 = model.load_adapter("en", config=config,model_name = model_path)
+adapter_name_3 = model.load_adapter("hi", config=config)
+adapter_name_3 = model.load_adapter("pfeiffer_xlm_base", config=config)
+model.set_active_adapters([adapter_name_1, adapter_name_3])
+
+
+
+# adapter_name_1 = model.load_adapter(
+#     os.path.join(model_path,"en"), config=config, model_name="xlm-roberta-base"
+# )
+# adapter_name_2 = model.load_adapter(
+#     os.path.join(model_path,"hi"), config=config
+# )
+# task_adapter = model.load_adapter(
+#    os.path.join(model_path,"pfeiffer_xlm_base"), source="hf", load_as="pfeiffer_xlm_base"
+# )
+# model.active_adapters = Stack(adapter_name_2, task_adapter)
 
 tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
 
