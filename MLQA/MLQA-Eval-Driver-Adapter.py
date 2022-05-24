@@ -21,23 +21,22 @@ from transformers import (
 )
 from transformers.adapters.composition import Stack
 
-context_language = "hi"
+context_language = "ar"
 batch_size = 16
 
 # model = AutoModelForQuestionAnswering.from_pretrained(
 #     f"subhasisj/{context_language}-kd-XLM-minilmv2-4",
 # )
-model_path = f"../multi-task-learning/{context_language}-adapter-en-trained"
+model_path = "subhasisj/ar-adapter-32"
 model = AutoAdapterModel.from_pretrained(
     model_path
 )
 
 config = AdapterConfig.load("pfeiffer", non_linearity="relu", reduction_factor=2)
-adapter_name_1 = model.load_adapter("en", config=config,model_name = model_path)
-adapter_name_3 = model.load_adapter("hi", config=config)
-adapter_name_3 = model.load_adapter("pfeiffer_xlm_base", config=config)
-model.set_active_adapters([adapter_name_1, adapter_name_3])
-
+adapter_name_1 = model.load_adapter('../multi-task-learning/hi-adapter-en-trained/en', config=config)
+adapter_name_2 = model.load_adapter(f'../multi-task-learning/{context_language}/{context_language}',config=config, model_name='xlm-roberta-base')
+task_adapter = model.load_adapter(f'../multi-task-learning/{context_language}/task', config=config)
+model.active_adapters = Stack(adapter_name_1, adapter_name_2, task_adapter)
 
 
 # adapter_name_1 = model.load_adapter(
@@ -267,7 +266,7 @@ for language in available_languages:
     # for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
     prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
 
-    predictions_file = f"./{context_language}/{technique}/formatted_predictions_{context_language}_{question_language}_kd.json"
+    predictions_file = f"./{context_language}/{technique}/formatted_predictions_{context_language}_{question_language}_{technique}.json"
     with open(
         predictions_file,
         "w",
@@ -275,7 +274,7 @@ for language in available_languages:
         json.dump(prediction_dict, f)
 
     # Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
-    evaluation_output_path = f"./{context_language}/{technique}/evaluation_output_{context_language}_{question_language}_kd.txt"
+    evaluation_output_path = f"./{context_language}/{technique}/evaluation_output_{context_language}_{question_language}_{technique}.txt"
     with open(evaluation_output_path, "w") as f:
         subprocess.run(
             [

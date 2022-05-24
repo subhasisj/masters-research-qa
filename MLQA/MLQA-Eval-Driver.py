@@ -15,11 +15,16 @@ from tqdm.auto import tqdm
 from transformers import AutoModelForQuestionAnswering, AutoTokenizer, Trainer
 
 
-context_language = "en"
+context_language = "hi"
 batch_size = 16
+technique = "teacher-model"
+if not os.path.exists(f"{context_language}/{technique}"):
+    os.mkdir(f"{context_language}/{technique}")
+
 
 model = AutoModelForQuestionAnswering.from_pretrained(
-    f"subhasisj/{context_language}-kd-XLM-minilmv2-4",
+    # f"subhasisj/{context_language}-kd-XLM-minilmv2-4",
+    "bhavikardeshna/xlm-roberta-base-hindi"
 )
 tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
 
@@ -236,7 +241,9 @@ for language in available_languages:
     # for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
     prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
 
-    predictions_file = f"./{context_language}/knowledge-distillation/formatted_predictions_{context_language}_{question_language}_kd.json"
+ 
+
+    predictions_file = f"./{context_language}/{technique}/formatted_predictions_{context_language}_{question_language}.json"
     with open(
         predictions_file,
         "w",
@@ -244,7 +251,7 @@ for language in available_languages:
         json.dump(prediction_dict, f)
 
     # Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
-    evaluation_output_path = f"./{context_language}/knowledge-distillation/evaluation_output_{context_language}_{question_language}_kd.txt"
+    evaluation_output_path = f"./{context_language}/{technique}/evaluation_output_{context_language}_{question_language}_kd.txt"
     with open(evaluation_output_path, "w") as f:
         subprocess.run(
             [
