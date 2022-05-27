@@ -15,32 +15,11 @@ from tqdm.auto import tqdm
 from transformers import AutoModelForQuestionAnswering, AutoTokenizer, Trainer
 
 
-context_language = "vi"
 batch_size = 8
-technique = "TAPT"
-if not os.path.exists(f"{context_language}"):
-    os.mkdir(f"{context_language}") 
-if not os.path.exists(f"{context_language}/{technique}"):
-    os.mkdir(f"{context_language}/{technique}")
+technique = "Baseline"
+    # f"subhasisj/{context_language}-finetuned-squad-qa-minilmv2-{batch_size}"
+model_name = "../Notebooks/squad-qa-minilmv2-XLMTokeinizer-8/checkpoint-7000"
 
-
-model = AutoModelForQuestionAnswering.from_pretrained(
-    f"subhasisj/{context_language}-finetuned-squad-qa-minilmv2-{batch_size}"
-)
-tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-print(f"Models Loaded to {device}....")
-print()
-# Load model into Huggingface Trainer
-
-trainer = Trainer(model=model)
-pad_on_right = tokenizer.padding_side == "right"
-max_length = 384  # The maximum length of a feature (question and context)
-doc_stride = 128  # Th
-max_answer_length = 30
 
 # ## MLQA Format
 #
@@ -196,60 +175,70 @@ def postprocess_qa_predictions(
 
 # for language in available_languages:
 # question_language = language
-print(f"Evaluating questions in {context_language} context.")
-xquad = load_dataset("xquad", f"xquad.{context_language}")
+def run_evaluation(context_language, batch_size, technique, trainer):
+    print(f"Evaluating questions in {context_language} context.")
+    xquad = load_dataset("xquad", f"xquad.{context_language}")
 
-validation_features = xquad.map(
-    prepare_validation_features,
-    batch_size=batch_size,
-    batched=True,
-    remove_columns=xquad["validation"].column_names,
-)
+    validation_features = xquad.map(
+        prepare_validation_features,
+        batch_size=batch_size,
+        batched=True,
+        remove_columns=xquad["validation"].column_names,
+    )
 
-raw_predictions = trainer.predict(validation_features["validation"])
+    raw_predictions = trainer.predict(validation_features["validation"])
 
-validation_features["validation"].set_format(
-    type=validation_features["validation"].format["type"],
-    columns=list(validation_features["validation"].features.keys()),
-)
+    validation_features["validation"].set_format(
+        type=validation_features["validation"].format["type"],
+        columns=list(validation_features["validation"].features.keys()),
+    )
 
-examples = xquad["validation"]
-features = validation_features["validation"]
+    examples = xquad["validation"]
+    features = validation_features["validation"]
 
-example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
-features_per_example = collections.defaultdict(list)
+    example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
+    features_per_example = collections.defaultdict(list)
 
-for i, feature in enumerate(features):
-    features_per_example[example_id_to_index[feature["example_id"]]].append(i)
+    for i, feature in enumerate(features):
+        features_per_example[example_id_to_index[feature["example_id"]]].append(i)
 
-final_predictions = postprocess_qa_predictions(
-    xquad["validation"], validation_features["validation"], raw_predictions.predictions
-)
+    final_predictions = postprocess_qa_predictions(
+        xquad["validation"],
+        validation_features["validation"],
+        raw_predictions.predictions,
+    )
 
-formatted_predictions = [
-    {"id": k, "prediction_text": v} for k, v in final_predictions.items()
-]
-references = [{"id": ex["id"], "answers": ex["answers"]} for ex in xquad["validation"]]
+    formatted_predictions = [
+        {"id": k, "prediction_text": v} for k, v in final_predictions.items()
+    ]
+    references = [
+        {"id": ex["id"], "answers": ex["answers"]} for ex in xquad["validation"]
+    ]
 
-# for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
-# prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
+    # for each item in formatted predictions create a dictionary with the id as key and the prediction_text as value
+    # prediction_dict = {p["id"]: p["prediction_text"] for p in formatted_predictions}
 
+    # predictions_file = f"./{context_language}/{technique}/formatted_predictions_{context_language}.json"
+    # with open(
+    #     predictions_file,
+    #     "w",
+    # ) as f:
+    #     json.dump(prediction_dict, f)
 
+    # Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
+    evaluation_output_path = (
+        f"./{context_language}/{technique}/evaluation_output_{context_language}.txt"
+    )
+    with open(evaluation_output_path, "w") as f:
+        from datasets import load_metric
 
-# predictions_file = f"./{context_language}/{technique}/formatted_predictions_{context_language}.json"
-# with open(
-#     predictions_file,
-#     "w",
-# ) as f:
-#     json.dump(prediction_dict, f)
-
-# Execute mlqa_evaluation_v1 script with arguments for dataset_file file and prediction_file  and write the console output to a file
-evaluation_output_path = f"./{context_language}/{technique}/evaluation_output_{context_language}.txt"
-with open(evaluation_output_path, "w") as f:
-    from datasets import load_metric
-    metric = load_metric("squad")
-    metric.compute(predictions=formatted_predictions, references=references)
-    f.write(str(metric.compute(predictions=formatted_predictions, references=references)))
+        metric = load_metric("squad")
+        metric.compute(predictions=formatted_predictions, references=references)
+        f.write(
+            str(
+                metric.compute(predictions=formatted_predictions, references=references)
+            )
+        )
     # subprocess.run(
     #     [
     #         "python",
@@ -260,7 +249,9 @@ with open(evaluation_output_path, "w") as f:
     #     ],
     #     stdout=f,
     # )
-print(f"Evaluation output written to file: {evaluation_output_path}")
+    print(f"Evaluation output written to file: {evaluation_output_path}")
+
+
 # os.system(
 #     f"python mlqa_evaluation_v1.py ./MLQA/Data/test/test-context-{context_language}-question-{question_language}.json ./MLQA/formatted_predictions_{context_language}_{question_language}_baseline.json {context_language}"
 # )
@@ -272,3 +263,27 @@ print(f"Evaluation output written to file: {evaluation_output_path}")
 # -   ARG3: Answer Language
 #
 # `python MLQA/mlqa_evaluation_v1.py ./MLQA/Data/test/test-context-en-question-hi.json ./MLQA/formatted_predictions_en_hi_baseline.json en`
+
+
+if __name__ == "__main__":
+    model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+    tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    print(f"Models Loaded to {device}....")
+    print()
+    # Load model into Huggingface Trainer
+
+    trainer = Trainer(model=model)
+    pad_on_right = tokenizer.padding_side == "right"
+    max_length = 384  # The maximum length of a feature (question and context)
+    doc_stride = 128  # Th
+    max_answer_length = 30
+    context_languages = ["en", "hi", "es", "zh", "ar", "de", "vi"]
+    for context_language in context_languages:
+        if not os.path.exists(f"{context_language}"):
+            os.mkdir(f"{context_language}")
+        if not os.path.exists(f"{context_language}/{technique}"):
+            os.mkdir(f"{context_language}/{technique}")
+        run_evaluation(context_language, batch_size, technique, trainer)
