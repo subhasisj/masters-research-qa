@@ -16,9 +16,9 @@ from transformers import AutoModelForQuestionAnswering, AutoTokenizer, Trainer
 
 
 batch_size = 8
-technique = "KD-EN"
+technique = "KD-ES"
     # f"subhasisj/{context_language}-finetuned-squad-qa-minilmv2-{batch_size}"
-model_name = "subhasisj/en-kd-XLM-minilmv2-4"
+model_name = "subhasisj/es-kd-XLM-minilmv2-32"
 
 
 # ## MLQA Format
